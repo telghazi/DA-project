@@ -1,6 +1,9 @@
 package cs451;
 
 import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.Socket;
@@ -22,6 +25,28 @@ public class Main {
                 handleSignal();
             }
         });
+    }
+
+    private static String[] parseConfig(Parser parser) {
+
+        String[] config_contents = new String[] {"1"};
+        try (FileReader reader = new FileReader(parser.config());
+            BufferedReader br = new BufferedReader(reader)) {
+
+            // read line by line
+            String line;
+            line = br.readLine();
+            config_contents = line.split(" ");
+            return(config_contents);
+           
+
+           
+
+        } catch (IOException e) {
+            System.err.format("IOException: %s%n", e);
+            return(config_contents);
+        }
+        
     }
 
     public static void main(String[] args) throws InterruptedException {
@@ -55,6 +80,10 @@ public class Main {
         System.out.println(parser.config() + "\n");
 
         System.out.println("Doing some initialization\n");
+
+        System.out.println(parseConfig(parser)[0]+" " +parseConfig(parser)[1] );
+
+       // if{parser.myId() == }
 
         System.out.println("Broadcasting and delivering messages...\n");
 
