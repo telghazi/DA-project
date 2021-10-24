@@ -81,9 +81,28 @@ public class Main {
 
         System.out.println("Doing some initialization\n");
 
-        System.out.println(parseConfig(parser)[0]+" " +parseConfig(parser)[1] );
+        int nbr_messages = Integer.parseInt(parseConfig(parser)[0]);
+        int server_id = Integer.parseInt(parseConfig(parser)[1]) ;
 
-       // if{parser.myId() == }
+        String myIp = "";
+        int myPort = 0;
+        for (Host host: parser.hosts()) {
+            if(host.getId() == parser.myId()){
+                myIp = host.getIp();
+                myPort = host.getPort();
+                break;
+            }
+        }
+
+        if(parser.myId() == server_id){
+            EchoServer server = new EchoServer(myPort); 
+            server.listen();
+        }
+
+        else {
+            EchoClient client = new EchoClient();
+            client.send(myPort);
+        }
 
         System.out.println("Broadcasting and delivering messages...\n");
 
