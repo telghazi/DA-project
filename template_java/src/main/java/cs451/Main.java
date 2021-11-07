@@ -7,15 +7,34 @@ import java.io.FileWriter;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.net.UnknownHostException;
+import java.net.InetAddress;
 
 public class Main {
+
+    private static EchoClient client = null;
+    private static EchoServer server = null;
+    private static String outputPath ;
 
     private static void handleSignal() {
         //immediately stop network packet processing
         System.out.println("Immediately stopping network packet processing.");
-
+        /*if (server != null) {
+            server.disconnect();
+        }
+        if (client != null) {
+            client.disconnect();
+        }*/
         //write/flush output file if necessary
         System.out.println("Writing output.");
+        if (server != null) {
+            server.writeOutput(outputPath);
+        }
+        if (client != null) {
+            client.writeOutput(outputPath);
+        }
+
+
     }
 
     private static void initSignalHandlers() {
@@ -63,7 +82,9 @@ public class Main {
         System.out.println("My ID: " + parser.myId() + "\n");
         System.out.println("List of resolved hosts is:");
         System.out.println("==========================");
+        int nbr_hosts = 0;
         for (Host host: parser.hosts()) {
+            nbr_hosts++;
             System.out.println(host.getId());
             System.out.println("Human-readable IP: " + host.getIp());
             System.out.println("Human-readable Port: " + host.getPort());
@@ -75,6 +96,8 @@ public class Main {
         System.out.println("===============");
         System.out.println(parser.output() + "\n");
 
+        outputPath = parser.output();
+
         System.out.println("Path to config:");
         System.out.println("===============");
         System.out.println(parser.config() + "\n");
@@ -85,25 +108,36 @@ public class Main {
         int server_id = Integer.parseInt(parseConfig(parser)[1]) ;
 
         String myIp = "";
-        int myPort = 0;
+        int serverPort = 0;
         for (Host host: parser.hosts()) {
-            if(host.getId() == parser.myId()){
+            if(host.getId() == server_id){
                 myIp = host.getIp();
-                myPort = host.getPort();
+                serverPort = host.getPort();
                 break;
             }
         }
-
+        InetAddress address = null;
+        try{
+            address = InetAddress.getByName(myIp);
+        }catch(UnknownHostException e){
+            System.out.println("error");
+        }
+        
+        System.out.println(address.toString());
         if(parser.myId() == server_id){
-            EchoServer server = new EchoServer(myPort); 
+            System.out.println("I am a server");
+            server = new EchoServer(serverPort, nbr_hosts); 
             server.listen();
         }
 
         else {
-            EchoClient client = new EchoClient();
-            client.send(myPort);
+            System.out.println("I am a client");
+            System.out.println("Sending to " + serverPort);
+            client = new EchoClient(parser.myPort(), address);
+            client.send(serverPort, parser.myId(), parser.myPort(), nbr_messages);
         }
-
+        
+        String ahi = "ahi";
         System.out.println("Broadcasting and delivering messages...\n");
 
         // After a process finishes broadcasting,

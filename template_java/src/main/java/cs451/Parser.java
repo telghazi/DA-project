@@ -70,4 +70,24 @@ public class Parser {
         return configParser.getPath();
     }
 
+    public int myPort() {
+        for (Host host: this.hosts()) {
+            if(host.getId() == this.myId()){
+                int myPort = host.getPort();
+                return(myPort);
+            }
+        }
+        return(0);
+    }
+
+
+    public String myIp() {
+        for (Host host: this.hosts()) {
+            if(host.getId() == this.myId()){
+                String myIp = host.getIp();
+                return(myIp);
+            }
+        }
+        return("");
+    }
 }
