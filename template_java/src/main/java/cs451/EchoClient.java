@@ -25,6 +25,7 @@ public class EchoClient{
 		
 		// Step 1:Create the socket object for
 		// carrying the data.
+		System.out.println("Opening Socket");
 		try {
             ackReceiver = new DatagramSocket(listening_port);
         }catch(SocketException e){
@@ -146,4 +147,8 @@ public class EchoClient{
         }
         return ret;
     }
+
+	public HashMap<String, Boolean> get_broadcastMessages(){
+		return(broadcastMessages);
+	}
 }

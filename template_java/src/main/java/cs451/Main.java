@@ -9,12 +9,55 @@ import java.io.InputStreamReader;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import java.net.InetAddress;
+import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.Scanner;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 public class Main {
 
     private static EchoClient client = null;
     private static EchoServer server = null;
     private static String outputPath ;
+    private static Thread thread;
+    static FIFOLayer fifoLayer;
+    public static ConcurrentLinkedQueue<String> eventLog = new ConcurrentLinkedQueue<String>();
+
+    private static void writeOutput(){
+        
+        String output = "";
+        if(client != null){
+            System.out.println("Writing broadcast messages.");
+            for (HashMap.Entry<String, Boolean> entry : client.get_broadcastMessages().entrySet()){
+                    output = output + "b" + " " + entry.getKey() + "\n";
+                    System.out.println(output);
+            }
+        }
+
+        if(server != null){
+            System.out.println("Writing delivered messages.");
+            for (ConcurrentHashMap.Entry<Integer, ConcurrentHashMap<String, Boolean>> entry : server.get_messagesToDeliver().entrySet()){
+                    int id = entry.getKey();
+
+                    ConcurrentHashMap<String, Boolean> messages = entry.getValue();
+                    for (ConcurrentHashMap.Entry<String, Boolean> m : messages.entrySet()){
+                        output = output + "d" + " " + Integer.toString(id) + " " + m.getKey() + "\n";
+                        System.out.println(output);
+                    }
+            }
+        }
+        try {
+            FileWriter myWriter = new FileWriter(outputPath, false);
+            myWriter.write(output);
+            myWriter.close();
+            
+            System.out.println("Successfully wrote to the file.");
+        } catch (IOException e) {
+            System.out.println("An error occurred.");
+            e.printStackTrace();
+        }
+        
+    }
 
     private static void handleSignal() {
         //immediately stop network packet processing
@@ -27,13 +70,30 @@ public class Main {
         }*/
         //write/flush output file if necessary
         System.out.println("Writing output.");
-        if (server != null) {
-            server.writeOutput(outputPath);
+        /*if (fifoLayer != null){
+            fifoLayer.writeOutput(outputPath);
+        }*/
+        try {
+            FileWriter myWriter = new FileWriter(outputPath, false);
+            boolean firstline = true;
+            for(String event : eventLog){
+                if(firstline){
+                    myWriter.write(event);
+                    firstline = false;
+                }
+                else {
+                    myWriter.write("\n" + event);
+                }
+            }
+            
+            myWriter.close();
+            
+            System.out.println("Successfully wrote to the file.");
+        } catch (IOException e) {
+            System.out.println("An error occurred.");
+            e.printStackTrace();
         }
-        if (client != null) {
-            client.writeOutput(outputPath);
-        }
-
+        System.out.println(eventLog);
 
     }
 
@@ -55,6 +115,7 @@ public class Main {
             // read line by line
             String line;
             line = br.readLine();
+            System.out.println(line);
             config_contents = line.split(" ");
             return(config_contents);
            
@@ -66,6 +127,15 @@ public class Main {
             return(config_contents);
         }
         
+    }
+
+    public static void talk(FIFOLayer urbLayer, int nbr_messages) {
+
+        String data;
+        for(int k = 1; k<nbr_messages+1; k++){
+
+            urbLayer.send(Integer.toString(k));
+        }
     }
 
     public static void main(String[] args) throws InterruptedException {
@@ -82,14 +152,15 @@ public class Main {
         System.out.println("My ID: " + parser.myId() + "\n");
         System.out.println("List of resolved hosts is:");
         System.out.println("==========================");
-        int nbr_hosts = 0;
+        int nbr_hosts_dummy = 0;
         for (Host host: parser.hosts()) {
-            nbr_hosts++;
+            nbr_hosts_dummy++;
             System.out.println(host.getId());
             System.out.println("Human-readable IP: " + host.getIp());
             System.out.println("Human-readable Port: " + host.getPort());
             System.out.println();
         }
+        final int nbr_hosts = nbr_hosts_dummy;
         System.out.println();
 
         System.out.println("Path to output:");
@@ -105,40 +176,20 @@ public class Main {
         System.out.println("Doing some initialization\n");
 
         int nbr_messages = Integer.parseInt(parseConfig(parser)[0]);
-        int server_id = Integer.parseInt(parseConfig(parser)[1]) ;
-
-        String myIp = "";
-        int serverPort = 0;
-        for (Host host: parser.hosts()) {
-            if(host.getId() == server_id){
-                myIp = host.getIp();
-                serverPort = host.getPort();
-                break;
-            }
-        }
-        InetAddress address = null;
-        try{
-            address = InetAddress.getByName(myIp);
-        }catch(UnknownHostException e){
-            System.out.println("error");
+        System.out.println("Sending " + Integer.toString(nbr_messages) + " messages");
+        // Retrieve own port for initialisation
+        int localPort = -1;
+        for ( Host host : parser.hosts()) {
+            if (host.getId() == parser.myId())
+                localPort = host.getPort();
         }
         
-        System.out.println(address.toString());
-        if(parser.myId() == server_id){
-            System.out.println("I am a server");
-            server = new EchoServer(serverPort, nbr_hosts); 
-            server.listen();
-        }
 
-        else {
-            System.out.println("I am a client");
-            System.out.println("Sending to " + serverPort);
-            client = new EchoClient(parser.myPort(), address);
-            client.send(serverPort, parser.myId(), parser.myPort(), nbr_messages);
-        }
-        
-        String ahi = "ahi";
         System.out.println("Broadcasting and delivering messages...\n");
+
+
+        FIFOLayer fifoLayer = new FIFOLayer(localPort, Integer.toString(parser.myId()), parser.hosts(), outputPath, eventLog);
+        talk(fifoLayer, nbr_messages);
 
         // After a process finishes broadcasting,
         // it waits forever for the delivery of messages.
